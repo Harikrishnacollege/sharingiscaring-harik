@@ -5,7 +5,7 @@ const app = express();
 app.use(express.json());
 
 // Hardcoded worker (for now)
-const WORKER_URL = "http://localhost:4000/execute";
+const WORKER_URL = "http://172.17.179.44:4000/execute";
 
 // Submit job
 app.post('/submit-job', async (req, res) => {
