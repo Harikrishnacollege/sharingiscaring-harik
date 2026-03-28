@@ -17,7 +17,11 @@ function getLocalIP() {
 
     for (let name of Object.keys(interfaces)) {
         for (let iface of interfaces[name]) {
-            if (iface.family === 'IPv4' && !iface.internal) {
+            if (
+                iface.family === 'IPv4' &&
+                !iface.internal &&
+                !iface.address.startsWith('192.168.137') // 🚫 ignore hotspot
+            ) {
                 return iface.address;
             }
         }
