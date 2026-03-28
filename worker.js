@@ -2,26 +2,55 @@ const express = require('express');
 const fs = require('fs');
 const { exec } = require('child_process');
 const path = require('path');
+const axios = require('axios');
+const os = require('os');
 
 const app = express();
-const axios = require('axios');
-
-const SERVER_URL = "http://10.138.216.160:3000";
-
-// Register worker
-axios.post(`${SERVER_URL}/register`, {
-    workerUrl: "http://10.138.216.160:4000"
-}).then(() => {
-    console.log("Registered with server");
-}).catch(err => {
-    console.log("Registration failed");
-});
-
 app.use(express.json());
 
-// Worker health check
+const PORT = 4000;
+const SERVER_URL = "http://10.138.216.160:3000"; // 👉 change if needed
+
+// 🔥 Function to get local IP dynamically
+function getLocalIP() {
+    const interfaces = os.networkInterfaces();
+
+    for (let name of Object.keys(interfaces)) {
+        for (let iface of interfaces[name]) {
+            if (iface.family === 'IPv4' && !iface.internal) {
+                return iface.address;
+            }
+        }
+    }
+}
+
+// Get IP
+const ip = getLocalIP();
+
+// Construct worker URL
+const workerUrl = `http://${ip}:${PORT}`;
+
+// 🧠 Unique worker ID (optional but useful)
+const workerId = `${ip}-${Date.now()}`;
+
+// 🔥 Register with server
+async function registerWorker() {
+    try {
+        await axios.post(`${SERVER_URL}/register`, {
+            workerUrl,
+            workerId
+        });
+
+        console.log("✅ Registered with server:", workerUrl);
+
+    } catch (err) {
+        console.error("❌ Registration failed:", err.message);
+    }
+}
+
+// Health check route
 app.get('/', (req, res) => {
-    res.send('Worker running');
+    res.send(`Worker running at ${workerUrl}`);
 });
 
 // Execute job
@@ -35,21 +64,33 @@ app.post('/execute', (req, res) => {
     const fileName = `job_${Date.now()}.js`;
     const filePath = path.join(__dirname, 'jobs', fileName);
 
+    // Save code
     fs.writeFileSync(filePath, code);
 
+    // Execute code
     exec(`node ${filePath}`, (err, stdout, stderr) => {
 
+        // Clean up
         fs.unlinkSync(filePath);
 
         if (err) {
-            return res.json({ status: "error", error: stderr });
+            return res.json({
+                status: "error",
+                error: stderr
+            });
         }
 
-        res.json({ status: "success", result: stdout });
+        res.json({
+            status: "success",
+            result: stdout
+        });
     });
 });
 
-// Start worker server
-app.listen(4000, '0.0.0.0', () => {
-    console.log('Worker running on port 4000');
+// Start server
+app.listen(PORT, '0.0.0.0', () => {
+    console.log(`🚀 Worker running at ${workerUrl}`);
+
+    // Register after server starts
+    registerWorker();
 });
