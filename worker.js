@@ -4,6 +4,19 @@ const { exec } = require('child_process');
 const path = require('path');
 
 const app = express();
+const axios = require('axios');
+
+const SERVER_URL = "http://10.138.216.160:3000";
+
+// Register worker
+axios.post(`${SERVER_URL}/register`, {
+    workerUrl: "http://10.138.216.160:4000"
+}).then(() => {
+    console.log("Registered with server");
+}).catch(err => {
+    console.log("Registration failed");
+});
+
 app.use(express.json());
 
 // Worker health check
