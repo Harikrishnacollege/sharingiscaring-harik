@@ -9,19 +9,15 @@ const app = express();
 app.use(express.json());
 
 const PORT = 4000;
-const SERVER_URL = "http://10.138.216.160:3000"; // 👉 change if needed
+const SERVER_URL = "http://10.138.216.160:3000"; // change if needed
 
-// 🔥 Function to get local IP dynamically
+// 🔥 Get local IP
 function getLocalIP() {
     const interfaces = os.networkInterfaces();
 
     for (let name of Object.keys(interfaces)) {
         for (let iface of interfaces[name]) {
-            if (
-                iface.family === 'IPv4' &&
-                !iface.internal
-            ) {
-                // Prefer WiFi-like IPs
+            if (iface.family === 'IPv4' && !iface.internal) {
                 if (
                     iface.address.startsWith('10.') ||
                     iface.address.startsWith('192.168.')
@@ -32,7 +28,7 @@ function getLocalIP() {
         }
     }
 
-    // fallback (if nothing matched)
+    // fallback
     for (let name of Object.keys(interfaces)) {
         for (let iface of interfaces[name]) {
             if (iface.family === 'IPv4' && !iface.internal) {
@@ -42,16 +38,11 @@ function getLocalIP() {
     }
 }
 
-// Get IP
 const ip = getLocalIP();
-
-// Construct worker URL
 const workerUrl = `http://${ip}:${PORT}`;
-
-// 🧠 Unique worker ID (optional but useful)
 const workerId = `${ip}-${Date.now()}`;
 
-// 🔥 Register with server
+// 🔥 Register worker
 async function registerWorker() {
     try {
         await axios.post(`${SERVER_URL}/register`, {
@@ -60,40 +51,58 @@ async function registerWorker() {
         });
 
         console.log("✅ Registered with server:", workerUrl);
-
     } catch (err) {
         console.error("❌ Registration failed:", err.message);
     }
 }
 
-// Health check route
+// Health check
 app.get('/', (req, res) => {
     res.send(`Worker running at ${workerUrl}`);
 });
 
-// Execute job
-exec(`docker run --rm -v ${__dirname}/jobs:/app node:18 node /app/${fileName}`, 
-(err, stdout, stderr) => {
+// 🚀 EXECUTE JOB (FIXED)
+app.post('/execute', (req, res) => {
+    const { code } = req.body;
 
-    fs.unlinkSync(filePath);
-
-    if (err) {
-        return res.json({
-            status: "error",
-            error: stderr
-        });
+    if (!code) {
+        return res.status(400).json({ error: "No code provided" });
     }
 
-    res.json({
-        status: "success",
-        result: stdout
+    const fileName = `job_${Date.now()}.js`;
+    const filePath = path.join(__dirname, 'jobs', fileName);
+
+    // Save file
+    fs.writeFileSync(filePath, code);
+
+    console.log(`🧠 Executing job on ${workerUrl}`);
+
+    // 🔥 DOCKER EXECUTION
+    const command = `docker run --rm -v ${__dirname}/jobs:/app node:18 node /app/${fileName}`;
+
+    exec(command, (err, stdout, stderr) => {
+
+        // delete file
+        fs.unlinkSync(filePath);
+
+        if (err) {
+            return res.json({
+                status: "error",
+                error: stderr,
+                worker: workerUrl
+            });
+        }
+
+        res.json({
+            status: "success",
+            result: stdout,
+            worker: workerUrl
+        });
     });
 });
 
 // Start server
 app.listen(PORT, '0.0.0.0', () => {
     console.log(`🚀 Worker running at ${workerUrl}`);
-
-    // Register after server starts
     registerWorker();
 });
