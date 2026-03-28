@@ -19,9 +19,23 @@ function getLocalIP() {
         for (let iface of interfaces[name]) {
             if (
                 iface.family === 'IPv4' &&
-                !iface.internal &&
-                !iface.address.startsWith('192.168.137') // 🚫 ignore hotspot
+                !iface.internal
             ) {
+                // Prefer WiFi-like IPs
+                if (
+                    iface.address.startsWith('10.') ||
+                    iface.address.startsWith('192.168.')
+                ) {
+                    return iface.address;
+                }
+            }
+        }
+    }
+
+    // fallback (if nothing matched)
+    for (let name of Object.keys(interfaces)) {
+        for (let iface of interfaces[name]) {
+            if (iface.family === 'IPv4' && !iface.internal) {
                 return iface.address;
             }
         }
