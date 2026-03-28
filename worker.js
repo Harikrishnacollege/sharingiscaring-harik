@@ -82,9 +82,11 @@ app.post('/execute', (req, res) => {
 
         res.json({
             status: "success",
-            result: stdout
+            result: stdout,
+            worker: workerUrl
         });
     });
+    console.log(`Worker ${workerUrl} executing job`);
 });
 
 // Start server
