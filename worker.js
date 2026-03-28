@@ -72,39 +72,22 @@ app.get('/', (req, res) => {
 });
 
 // Execute job
-app.post('/execute', (req, res) => {
-    const { code } = req.body;
+exec(`docker run --rm -v ${__dirname}/jobs:/app node:18 node /app/${fileName}`, 
+(err, stdout, stderr) => {
 
-    if (!code) {
-        return res.status(400).json({ error: "No code provided" });
+    fs.unlinkSync(filePath);
+
+    if (err) {
+        return res.json({
+            status: "error",
+            error: stderr
+        });
     }
 
-    const fileName = `job_${Date.now()}.js`;
-    const filePath = path.join(__dirname, 'jobs', fileName);
-
-    // Save code
-    fs.writeFileSync(filePath, code);
-
-    // Execute code
-    exec(`node ${filePath}`, (err, stdout, stderr) => {
-
-        // Clean up
-        fs.unlinkSync(filePath);
-
-        if (err) {
-            return res.json({
-                status: "error",
-                error: stderr
-            });
-        }
-
-        res.json({
-            status: "success",
-            result: stdout,
-            worker: workerUrl
-        });
+    res.json({
+        status: "success",
+        result: stdout
     });
-    console.log(`Worker ${workerUrl} executing job`);
 });
 
 // Start server
